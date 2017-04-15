@@ -27,7 +27,7 @@ from session import FacebookBotRedisSessionManager
 
 app = Flask(__name__, static_folder="static")
 
-redis_store = redis.from_url("redis://localhost:6379/0")
+redis_store = redis.from_url(os.environ.get("REDIS_URL"))
 session_manager = FacebookBotRedisSessionManager(redis_store)
 wit = create_client()
 

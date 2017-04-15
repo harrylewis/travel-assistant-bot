@@ -5,10 +5,9 @@ from send import send_message, send_attachment
 from debug import logger
 import os
 import redis
-import ast
 
 
-redis_store = redis.from_url("redis://localhost:6379/0")
+redis_store = redis.from_url(os.environ.get("REDIS_URL"))
 session_manager = FacebookBotRedisSessionManager(redis_store)
 
 
