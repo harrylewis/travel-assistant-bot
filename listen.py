@@ -38,6 +38,11 @@ FB_VERIFY_TOKEN = os.environ["FB_VERIFICATION_TOKEN"]
 FB_ACCESS_TOKEN = os.environ["FB_ACCESS_TOKEN"]
 
 
+@app.route("/")
+def root():
+    return "Canadian Travel Assistant"
+
+
 @app.route(ROOT.format(FB_CALLBACK), methods=["GET"])
 def verify_token():
     # check for request type
