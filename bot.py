@@ -1,9 +1,15 @@
 from wit import Wit
 from scraper import advisory_country
-from sessions import sessions
+from session import FacebookBotRedisSessionManager
 from send import send_message, send_attachment
 from debug import logger
 import os
+import redis
+import ast
+
+
+redis_store = redis.from_url("redis://localhost:6379/0")
+session_manager = FacebookBotRedisSessionManager(redis_store)
 
 
 ACCESS_TOKEN = os.environ["WIT_API_KEY"]
@@ -18,7 +24,7 @@ def send(request, response):
     :return: True
     """
     context = request["context"]
-    id_ = sessions[request["session_id"]]["id"]
+    id_ = session_manager.get_session(request["session_id"])["id"]
 
     # check if the country is missing
     if "country_missing" in context and context["country_missing"]:
@@ -38,8 +44,9 @@ def send(request, response):
         # prepare image
         image = "static/adv-cat-{}.png".format(context["advisory_code"])
         indicator = "This is a category {} warning (out of 4)".format(context["advisory_code"])
+        url = "https://travel.gc.ca{}".format(context["url"])
 
-        send_attachment(id_, response["text"], indicator, image)
+        send_attachment(id_, response["text"], indicator, image, url)
 
     return True
 
@@ -58,7 +65,7 @@ def get_travel_advisory(request):
     country = first_entity_value(entities, "country")
 
     if country:
-        # ladies and gentlemen, we have a country, so let's get the avisory
+        # ladies and gentlemen, we have a country, so let's get the advisory
         advisory = advisory_country(country)
         # remove certain entities
         context = remove_entities(context, ["country_missing"])
@@ -66,6 +73,7 @@ def get_travel_advisory(request):
         context["country"] = advisory["name"]
         context["advisory"] = advisory["advisory"]
         context["advisory_code"] = advisory["advisory_code"]
+        context["url"] = advisory["url"]
     else:
         # no country found, remove certain entities
         context = remove_entities(context, ["advisory", "country", "advisory_code"])

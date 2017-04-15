@@ -2,7 +2,7 @@ import requests
 import os
 
 
-IMAGE_ENDPOINT = "https://31dca6a4.ngrok.io/{}"
+IMAGE_ENDPOINT = "https://0805c51c.ngrok.io/{}"
 FB_API_ENDPOINT = "https://graph.facebook.com/v{}/me/{}?access_token={}"
 FB_API_VERSION = os.environ["FB_API_VERSION"]
 FB_ACCESS_TOKEN = os.environ["FB_ACCESS_TOKEN"]
@@ -45,7 +45,24 @@ def send_typing(recipient):
     return send("messages", data)
 
 
-def send_attachment(recipient, message, submessage, image):
+def send_mark_seen(recipient):
+    """
+    This function sends a "seen" indicator to the Facebook Send API.
+
+    :param recipient: Facebook ID
+    :return: response
+    """
+    data = {
+        "recipient": {
+            "id": recipient
+        },
+        "sender_action": "mark_seen"
+    }
+
+    return send("messages", data)
+
+
+def send_attachment(recipient, message, submessage, image, link):
     """
     This function sends an attachment to the Facebook Send API.
 
@@ -70,6 +87,11 @@ def send_attachment(recipient, message, submessage, image):
                             "subtitle": submessage,
                             "image_url": IMAGE_ENDPOINT.format(image),
                             "buttons": [
+                                {
+                                    "type": "web_url",
+                                    "url": link,
+                                    "title": "Read More"
+                                },
                                 {
                                     "type": "element_share"
                                 }

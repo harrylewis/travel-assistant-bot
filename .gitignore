@@ -178,6 +178,10 @@ keys.txt
 # Project Specific Python Files
 bot-tester.py
 
-
 # Project Specific Folders
 assets/
+
+# Project Specific Redis
+redis/
+redis/*
+dump.rdb

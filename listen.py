@@ -1,19 +1,34 @@
 #!bin/python
 
 # TODO: use os.environ.get("", default) instead of os.environ[key]
+# TODO: Current "behavioural bug" where greeting only appears once, when user
+# TODO: FIRST interacts with the page. That's fine, I thought it was if there
+# TODO: was a session or not, but that is just on my side. In my code, if no
+# TODO: session is present, it just returns, because I thought this would go
+# TODO: straight to a greeting. Have to figure out a way around this. If there
+# TODO: is a flag to know whether it is a new message connection or not, that
+# TODO: would be good, otherwise, hopefully just the fact that redis has the
+# TODO: session stored is good enough. Not really expecting down time on it.
+
+# NOTE: Greeting only appears once! Once for on each new page access token, for
+# every NEW messenger connection. Ideally since the page access token should
+# never change, it should be eternally once.
 
 from flask import (Flask, jsonify, request, make_response)
 import os
+import redis
+import ast
 
 from bot import create_client
-from sessions import sessions, find_or_create_session
-from send import send_typing, send_message
+from send import send_typing, send_message, send_mark_seen
 from debug import logger
+from session import FacebookBotRedisSessionManager
 
 
 app = Flask(__name__, static_folder="static")
 
-
+redis_store = redis.from_url("redis://localhost:6379/0")
+session_manager = FacebookBotRedisSessionManager(redis_store)
 wit = create_client()
 
 
@@ -47,7 +62,7 @@ def verify_token():
 @app.route(ROOT.format(FB_CALLBACK), methods=["POST"])
 def webhook_callback():
     ###
-    logger.info("Messaging event received.")
+    logger.info("MESSAGING EVENT RECEIVED.")
     ###
 
     data = request.json
@@ -60,18 +75,32 @@ def webhook_callback():
             for event in entry["messaging"]:
                 # check if we have a new message
                 if "message" in event:
-                    print event
+
+                    ###
+                    logger.info("MESSAGE RECEIVED.")
+                    ###
+
                     # get sender
                     sender = event["sender"]["id"]
-                    # find or create session
-                    session_id, new_session = find_or_create_session(sender)
+                    # get session token
+                    token = session_manager.get_session_token(sender)
+                    # try and find session
+                    existing_session = session_manager.get_session(token)
                     # get message
                     message = event["message"]
                     # check to see if this is a new user/session
-                    if new_session:
+                    if existing_session is None:
                         ###
                         logger.info("New session: {}".format(sender))
                         ###
+
+                        # mark seen
+                        send_mark_seen(sender)
+
+                        session_manager.create_session(sender, **{
+                            "context": {},
+                            "lang": 0
+                        })
                     # check to see if it is a message or attachment
                     elif "attachments" in message:
 
@@ -79,8 +108,10 @@ def webhook_callback():
                         logger.info("Attachment received from: {}".format(sender))
                         ###
 
+                        # typing...
+                        send_typing(sender)
                         # cannot process attachments
-                        send_message(sender, "I can't do much with that, but if you send me a country, I can tell you what the travel advisory is for it.")
+                        send_message(sender, "I can't do much with that, but if you send me the name of a country, I can tell you the travel advisory for it.")
                     elif "text" in message:
 
                         ###
@@ -89,24 +120,45 @@ def webhook_callback():
 
                         # typing...
                         send_typing(sender)
+                        # get session ID
+                        session_id = session_manager.get_session_token(sender)
                         # converse
-                        new_context = wit.run_actions(session_id, message["text"], sessions[session_id]["context"])
+                        new_context = wit.run_actions(session_id, message["text"], ast.literal_eval(existing_session["context"]))
                         # update session
-                        sessions[session_id]["context"] = new_context
+                        session_manager.update_session(sender, **{
+                            "context": new_context
+                        })
                 # check if we have a message delivered
                 elif "delivery" in event:
                     ###
-                    logger.info("Message delivered")
+                    logger.info("MESSAGE DELIVERED.")
+                    ###
+                # check if a message was read
+                elif "read" in event:
+                    ###
+                    logger.info("MESSAGE READ.")
                     ###
                 # check if we have a postback
                 elif "postback" in event:
                     ###
-                    logger.info("Postback")
+                    logger.info("POSTBACK RECEIVED.")
                     ###
+
+                    # get sender
+                    sender = event["sender"]["id"]
+                    # get postback data
+                    postback = event["postback"]
+                    payload = postback["payload"]
+                    # what do I do?
+                    if payload == "WHAT_DO_I_DO":
+                        # typing...
+                        send_typing(sender)
+                        # cannot process attachments
+                        send_message(sender, "I want you to help you stay informed when travelling abroad. Ask me something like \"What is the current travel advisory for the Brazil?\".")
                 else:
 
                     ###
-                    logger.error("Unknown messaging event received.")
+                    logger.error("UKNOWN MESSAGING EVENT.")
                     ###
 
     return make_response(jsonify({}), 200)
