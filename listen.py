@@ -170,7 +170,7 @@ def webhook_callback():
 
 
 def main():
-    app.run(port=5000, debug=True)
+    app.run()
 
 
 if __name__ == "__main__":
