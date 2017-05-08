@@ -14,7 +14,7 @@
 # every NEW messenger connection. Ideally since the page access token should
 # never change, it should be eternally once.
 
-from flask import (Flask, jsonify, request, make_response)
+from flask import (Flask, jsonify, request, make_response, render_template)
 import os
 import redis
 import ast
@@ -41,6 +41,11 @@ FB_ACCESS_TOKEN = os.environ["FB_ACCESS_TOKEN"]
 @app.route("/")
 def root():
     return "Canadian Travel Assistant"
+
+
+@app.route("/facebook_privacy_policy/")
+def facebook_privacy_policy():
+    return render_template("privacy-policy.html")
 
 
 @app.route(ROOT.format(FB_CALLBACK), methods=["GET"])

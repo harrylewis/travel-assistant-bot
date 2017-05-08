@@ -2,7 +2,7 @@ import requests
 import os
 
 
-IMAGE_ENDPOINT = "https://canadiantravelassistant.herokuapp.com/{}"
+IMAGE_ENDPOINT = "https://canadiantravelassistant-stage.herokuapp.com/{}"
 FB_API_ENDPOINT = "https://graph.facebook.com/v{}/me/{}?access_token={}"
 FB_API_VERSION = os.environ["FB_API_VERSION"]
 FB_ACCESS_TOKEN = os.environ["FB_ACCESS_TOKEN"]
