@@ -17,7 +17,6 @@
 from flask import (Flask, jsonify, request, make_response, render_template)
 import os
 import redis
-import ast
 
 from bot import create_client, handle_message
 from send import send_typing, send_message, send_mark_seen
