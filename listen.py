@@ -122,7 +122,7 @@ def webhook_callback():
                             # typing...
                             send_typing(sender)
                             # cannot process attachments
-                            send_message(sender, "I can't do much with that, but if you send me the name of a country, I can tell you the travel advisory for it.")
+                            send_message(sender, "I can't do much with that, but if you send me a name of a country, I can tell you the travel advisory for it.")
                         elif "text" in message:
 
                             ###
