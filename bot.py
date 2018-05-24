@@ -14,80 +14,42 @@ session_manager = FacebookBotRedisSessionManager(redis_store)
 ACCESS_TOKEN = os.environ["WIT_API_KEY"]
 
 
-def send(request, response):
+def send(session_id, country):
     """
     This function sends messages from Wit to Messenger.
 
-    :param request: The request
-    :param response: The response
+    :param session_id:
+    :param country:
     :return: True
     """
-    context = request["context"]
-    id_ = session_manager.get_session(request["session_id"])["id"]
+    id_ = session_manager.get_session(session_id)["id"]
 
     # check if the country is missing
-    if "country_missing" in context and context["country_missing"]:
+    if country is None:
 
         # at some point, I should add the text to the context in get_travel_advisory so I can access it here
         ###
         logger.error("{}, Country: Missing".format(id_))
         ###
 
-        send_message(id_, response["text"])
+        send_message(id_, "Where? I'm still getting the hang of this. Try and make sure the country is spelled correctly.")
     else:
 
         ###
-        logger.info("{}, Country: {}".format(id_, context["country"]))
+        logger.info("{}, Country: {}".format(id_, country))
         ###
+
+        # get advisory
+        advisory = advisory_country(country)
 
         # prepare image
-        image = "static/adv-cat-{}.png".format(context["advisory_code"])
-        indicator = "This is a category {} warning (out of 4)".format(context["advisory_code"])
-        url = "https://travel.gc.ca{}".format(context["url"])
+        image = "static/adv-cat-{}.png".format(advisory["advisory_code"])
+        indicator = "This is a category {} warning (out of 4)".format(advisory["advisory_code"])
+        url = "https://travel.gc.ca{}".format(advisory["url"])
 
-        send_attachment(id_, response["text"], indicator, image, url)
+        send_attachment(id_, "{}: {}".format(country, advisory["advisory"]), indicator, image, url)
 
     return True
-
-
-def get_travel_advisory(request):
-    """
-    This function updates the context with a country advisory, or a country
-    missing flag.
-
-    :param request: The request sent by the client
-    :return: updated context
-    """
-    context = request["context"]
-    entities = request["entities"]
-
-    country = first_entity_value(entities, "country")
-
-    if country:
-        # ladies and gentlemen, we have a country, so let's get the advisory
-        advisory = advisory_country(country)
-        # remove certain entities
-        context = remove_entities(context, ["country_missing"])
-        # set the advisory values
-        context["country"] = advisory["name"]
-        context["advisory"] = advisory["advisory"]
-        context["advisory_code"] = advisory["advisory_code"]
-        context["url"] = advisory["url"]
-    else:
-        # no country found, remove certain entities
-        context = remove_entities(context, ["advisory", "country", "advisory_code"])
-        context["country_missing"] = True
-
-    return context
-
-
-def clear_session(request):
-    """
-
-    :param request:
-    :return:
-    """
-    return {}
 
 
 def first_entity_value(entities, entity):
@@ -109,30 +71,24 @@ def first_entity_value(entities, entity):
     return value["value"] if isinstance(value, dict) else value
 
 
-def remove_entities(context, entities):
+def handle_message(response, session_id):
     """
-    This function removes the keys "entities" from the context.
+    This function handles all text responses
 
-    :param context: A Wit context
-    :param entities: A list of strings/entities
-    :return: updated context
+    :param response: A Wit response context
+    :param session_id
+    :return: None
     """
-    for entity in entities:
-        if context.get(entity) is not None:
-            del context[entity]
+    # get all entities
+    entities = response["entities"]
+    # see if country entity present
+    country = first_entity_value(entities, "country")
 
-    return context
-
-
-actions = {
-    "send": send,
-    "get_travel_advisory": get_travel_advisory,
-    "clear_session": clear_session
-}
+    send(session_id, country)
 
 
 def create_client():
-    return Wit(access_token=ACCESS_TOKEN, actions=actions)
+    return Wit(access_token=ACCESS_TOKEN)
 
 
 def main():

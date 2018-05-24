@@ -19,7 +19,7 @@ import os
 import redis
 import ast
 
-from bot import create_client
+from bot import create_client, handle_message
 from send import send_typing, send_message, send_mark_seen
 from debug import logger
 from session import FacebookBotRedisSessionManager
@@ -81,95 +81,95 @@ def webhook_callback():
     if data["object"] == "page":
         # go through each entry
         for entry in data["entry"]:
-            # go through each messaging event
-            for event in entry["messaging"]:
-                # check if we have a new message
-                if "message" in event:
-
-                    ###
-                    logger.info("MESSAGE RECEIVED.")
-                    ###
-
-                    # get sender
-                    sender = event["sender"]["id"]
-                    # get session token
-                    token = session_manager.get_session_token(sender)
-                    # try and find session
-                    existing_session = session_manager.get_session(token)
-                    # get message
-                    message = event["message"]
-                    # check to see if this is a new user/session
-                    if existing_session is None:
-                        ###
-                        logger.info("New session: {}".format(sender))
-                        ###
-
-                        # mark seen
-                        send_mark_seen(sender)
-
-                        session_manager.create_session(sender, **{
-                            "context": {},
-                            "lang": 0
-                        })
-                    # check to see if it is a message or attachment
-                    elif "attachments" in message:
+            # only if messaging
+            if "messaging" in entry:
+                # go through each messaging event
+                for event in entry["messaging"]:
+                    # check if we have a new message
+                    if "message" in event:
 
                         ###
-                        logger.info("Attachment received from: {}".format(sender))
+                        logger.info("MESSAGE RECEIVED.")
                         ###
 
-                        # typing...
-                        send_typing(sender)
-                        # cannot process attachments
-                        send_message(sender, "I can't do much with that, but if you send me the name of a country, I can tell you the travel advisory for it.")
-                    elif "text" in message:
+                        # get sender
+                        sender = event["sender"]["id"]
+                        # get session token
+                        token = session_manager.get_session_token(sender)
+                        # try and find session
+                        existing_session = session_manager.get_session(token)
+                        # get message
+                        message = event["message"]
+                        # check to see if this is a new user/session
+                        if existing_session is None:
+                            ###
+                            logger.info("New session: {}".format(sender))
+                            ###
+
+                            # mark seen
+                            send_mark_seen(sender)
+
+                            session_manager.create_session(sender, **{
+                                "context": {},
+                                "lang": 0
+                            })
+                        # check to see if it is a message or attachment
+                        elif "attachments" in message:
+
+                            ###
+                            logger.info("Attachment received from: {}".format(sender))
+                            ###
+
+                            # typing...
+                            send_typing(sender)
+                            # cannot process attachments
+                            send_message(sender, "I can't do much with that, but if you send me the name of a country, I can tell you the travel advisory for it.")
+                        elif "text" in message:
+
+                            ###
+                            logger.info("Text received from: {}".format(sender))
+                            ###
+
+                            # typing...
+                            send_typing(sender)
+                            # get session ID
+                            session_id = session_manager.get_session_token(sender)
+                            # converse
+                            response = wit.message(msg=message["text"], context={"session_id": session_id})
+                            # respond
+                            handle_message(response, session_id)
+                    # check if we have a message delivered
+                    elif "delivery" in event:
+                        ###
+                        logger.info("MESSAGE DELIVERED.")
+                        ###
+                    # check if a message was read
+                    elif "read" in event:
+                        ###
+                        logger.info("MESSAGE READ.")
+                        ###
+                    # check if we have a postback
+                    elif "postback" in event:
+                        ###
+                        logger.info("POSTBACK RECEIVED.")
+                        ###
+
+                        # get sender
+                        sender = event["sender"]["id"]
+                        # get postback data
+                        postback = event["postback"]
+                        payload = postback["payload"]
+                        # what do I do?
+                        if payload == "WHAT_DO_I_DO":
+                            # typing...
+                            send_typing(sender)
+                            # cannot process attachments
+                            send_message(sender, "I want you to help you stay informed when travelling abroad. Ask me something like \"What is the current travel advisory for the Brazil?\".")
+                    else:
 
                         ###
-                        logger.info("Text received from: {}".format(sender))
+                        logger.error("UKNOWN MESSAGING EVENT.")
                         ###
-
-                        # typing...
-                        send_typing(sender)
-                        # get session ID
-                        session_id = session_manager.get_session_token(sender)
-                        # converse
-                        new_context = wit.run_actions(session_id, message["text"], ast.literal_eval(existing_session["context"]))
-                        # update session
-                        session_manager.update_session(sender, **{
-                            "context": new_context
-                        })
-                # check if we have a message delivered
-                elif "delivery" in event:
-                    ###
-                    logger.info("MESSAGE DELIVERED.")
-                    ###
-                # check if a message was read
-                elif "read" in event:
-                    ###
-                    logger.info("MESSAGE READ.")
-                    ###
-                # check if we have a postback
-                elif "postback" in event:
-                    ###
-                    logger.info("POSTBACK RECEIVED.")
-                    ###
-
-                    # get sender
-                    sender = event["sender"]["id"]
-                    # get postback data
-                    postback = event["postback"]
-                    payload = postback["payload"]
-                    # what do I do?
-                    if payload == "WHAT_DO_I_DO":
-                        # typing...
-                        send_typing(sender)
-                        # cannot process attachments
-                        send_message(sender, "I want you to help you stay informed when travelling abroad. Ask me something like \"What is the current travel advisory for the Brazil?\".")
-                else:
-
-                    ###
-                    logger.error("UKNOWN MESSAGING EVENT.")
-                    ###
 
     return make_response(jsonify({}), 200)
 
